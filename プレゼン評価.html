@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>プレゼン評価フォーム</title>
+  <style>
+    :root { --gap: 12px; }
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", sans-serif; margin: 24px; }
+    h1 { margin-top: 0; }
+    .card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin-bottom: var(--gap); box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+    fieldset { border: none; padding: 0; margin: 0; }
+    .person { display: grid; grid-template-columns: 1fr; gap: var(--gap); }
+    .row { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+    .label { font-weight: 600; min-width: 6em; }
+    textarea { width: 100%; min-height: 90px; padding: 8px; border-radius: 8px; border: 1px solid #d1d5db; }
+    .actions { display: flex; gap: 12px; margin-top: 12px; }
+    button { padding: 10px 16px; border-radius: 10px; border: 1px solid #cbd5e1; cursor: pointer; background: #111827; color: #fff; }
+    button.secondary { background: #f8fafc; color: #111827; }
+    .note { color: #6b7280; font-size: 0.92rem; }
+    .required { color: #ef4444; font-weight: 600; margin-left: 6px; font-size: 0.9rem; }
+    @media (min-width: 720px){ .person { grid-template-columns: 1fr 1fr; } }
+  </style>
+</head>
+<body>
+  <h1>プレゼン評価フォーム</h1>
+  <p class="note">対象：山本さん / 鈴木さん。評価（A/B/C）とコメントを入力し、保存でCSVをダウンロードします。</p>
+
+  <form id="evalForm" class="card" onsubmit="event.preventDefault();">
+    <fieldset>
+      <legend style="font-weight:700; margin-bottom: 12px;">評価入力</legend>
+
+      <!-- 山本さん -->
+      <div class="person card" aria-labelledby="y-title">
+        <div class="row" id="y-title"><span class="label">山本さん</span><span class="required">＊評価必須</span></div>
+        <div class="row" role="group" aria-label="山本さんの評価">
+          <label><input type="radio" name="yamamoto_grade" value="A" required> A</label>
+          <label><input type="radio" name="yamamoto_grade" value="B"> B</label>
+          <label><input type="radio" name="yamamoto_grade" value="C"> C</label>
+        </div>
+        <div class="col">
+          <label for="yamamoto_comment" class="label">コメント</label>
+          <textarea id="yamamoto_comment" name="yamamoto_comment" placeholder="良かった点、改善点など"></textarea>
+        </div>
+      </div>
+
+      <!-- 鈴木さん -->
+      <div class="person card" aria-labelledby="s-title">
+        <div class="row" id="s-title"><span class="label">鈴木さん</span><span class="required">＊評価必須</span></div>
+        <div class="row" role="group" aria-label="鈴木さんの評価">
+          <label><input type="radio" name="suzuki_grade" value="A" required> A</label>
+          <label><input type="radio" name="suzuki_grade" value="B"> B</label>
+          <label><input type="radio" name="suzuki_grade" value="C"> C</label>
+        </div>
+        <div class="col">
+          <label for="suzuki_comment" class="label">コメント</label>
+          <textarea id="suzuki_comment" name="suzuki_comment" placeholder="良かった点、改善点など"></textarea>
+        </div>
+      </div>
+
+    </fieldset>
+
+    <div class="actions">
+      <button type="button" id="saveBtn">CSVを保存</button>
+      <button type="reset" class="secondary">入力をクリア</button>
+    </div>
+  </form>
+
+  <script>
+    function escapeCSV(value) {
+      if (value == null) return "";
+      const s = String(value).replaceAll('"', '""');
+      // 値にカンマ、改行、引用符が含まれる場合は引用符で囲む
+      if (/[",\n\r]/.test(s)) return '"' + s + '"';
+      return s;
+    }
+
+    function downloadCSV(filename, csvText) {
+      // Excel での文字化け防止にBOM付与
+      const BOM = "\uFEFF";
+      const blob = new Blob([BOM + csvText], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function getRadioValue(name) {
+      const el = document.querySelector(`input[name="${name}"]:checked`);
+      return el ? el.value : "";
+    }
+
+    function formatDateForFilename(date){
+      const pad = n => String(n).padStart(2, '0');
+      return `${date.getFullYear()}${pad(date.getMonth()+1)}${pad(date.getDate())}_${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
+    }
+
+    document.getElementById('saveBtn').addEventListener('click', () => {
+      const yGrade = getRadioValue('yamamoto_grade');
+      const sGrade = getRadioValue('suzuki_grade');
+
+      // 必須チェック
+      if (!yGrade || !sGrade) {
+        alert('評価（A/B/C）は両名とも必須です。');
+        return;
+      }
+
+      const yComment = document.getElementById('yamamoto_comment').value.trim();
+      const sComment = document.getElementById('suzuki_comment').value.trim();
+
+      const now = new Date();
+      const timestamp = now.toLocaleString('ja-JP');
+
+      // CSV作成（ヘッダー + 2行）
+      const headers = ['名前','評価','コメント','保存日時'];
+      const rows = [
+        ['山本さん', yGrade, yComment, timestamp],
+        ['鈴木さん', sGrade, sComment, timestamp]
+      ];
+
+      const csv = [headers, ...rows]
+        .map(row => row.map(escapeCSV).join(','))
+        .join('\n');
+
+      const filename = `presentation_evaluation_${formatDateForFilename(now)}.csv`;
+      downloadCSV(filename, csv);
+    });
+  </script>
+</body>
+</html>
