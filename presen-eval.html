@@ -53,7 +53,7 @@
 
   <div class="save">
     <button id="saveBtn">CSVで保存</button>
-    <div class="hint">CSV（ヘッダ付き）：自分の名前, 評価対象チーム, 観点1, 観点2, 観点3, 観点4, 良かった点, 改善できる点</div>
+    <div class="hint">CSV（ヘッダ付き）：タイムスタンプ, 自分の名前, 評価対象チーム, 観点1, 観点2, 観点3, 観点4, 良かった点, 改善できる点</div>
     <div id="saveDialogStatus" class="muted"></div>
     <div id="errorBox" role="alert" aria-live="polite"></div>
   </div>
@@ -74,8 +74,21 @@
       { value: 4, text: "4: 非常にそう思う" }
     ];
 
-    const HEADER = ["自分の名前","評価対象チーム","観点1","観点2","観点3","観点4","良かった点","改善できる点"];
-    const EOL = "\r\n"; // Windows/Excel
+    const HEADER = ["タイムスタンプ","自分の名前","評価対象チーム","観点1","観点2","観点3","観点4","良かった点","改善できる点"];
+    const EOL = "
+"; // Windows/Excel
+
+    function formatTimestamp(){
+      const d = new Date();
+      const pad = n => String(n).padStart(2,'0');
+      const y = d.getFullYear();
+      const m = pad(d.getMonth()+1);
+      const day = pad(d.getDate());
+      const h = pad(d.getHours());
+      const mi = pad(d.getMinutes());
+      const s = pad(d.getSeconds());
+      return `${y}-${m}-${day} ${h}:${mi}:${s}`; // ローカル時刻
+    }
 
     // ================= ユーティリティ =================
     function $(sel, root=document){ return root.querySelector(sel); }
@@ -305,7 +318,8 @@
         });
         const good = (document.getElementById(`${tKey}_good`)?.value || '').trim();
         const improve = (document.getElementById(`${tKey}_improve`)?.value || '').trim();
-        const row = [myName, teamName, ...scores, good, improve].map(csvEscape).join(',');
+        const ts = formatTimestamp();
+        const row = [ts, myName, teamName, ...scores, good, improve].map(csvEscape).join(',');
         lines.push(row);
       });
 
@@ -328,20 +342,27 @@
     initData().then(() => {
       const { errors } = validateAll();
       renderErrors(errors);
+    });
 
-      // ▼ リアルタイム検証（入力のたびに未入力リストを更新）
-      document.addEventListener('input', (e) => {
-        if (e.target.matches('#myName, textarea, input[type="radio"]')) {
-          const { errors } = validateAll();
-          renderErrors(errors);
-        }
-      });
-      document.getElementById('myTeam').addEventListener('change', () => {
+    // ▼ リアルタイム検証（動的生成後でも確実に拾うため委任で常時有効）
+    document.addEventListener('input', (e) => {
+      if (e.target.matches('#myName, textarea, input[type="text"]')) {
+        const { errors } = validateAll();
+        renderErrors(errors);
+      }
+    });
+    document.addEventListener('change', (e) => {
+      if (e.target.matches('#myTeam')) {
         updateVisibility();
         const { errors } = validateAll();
         renderErrors(errors);
-      });
+      }
+      if (e.target.matches('input[type="radio"], textarea, input[type="text"]')) {
+        const { errors } = validateAll();
+        renderErrors(errors);
+      }
     });
+      // （不要な重複リスナーを削除済み）
 
     // ========== 簡易テスト（既存は保持しつつ、動的読み込みに合わせて拡張） ==========
     (function runSmokeTests(){
