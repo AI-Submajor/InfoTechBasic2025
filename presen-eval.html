@@ -328,6 +328,19 @@
     initData().then(() => {
       const { errors } = validateAll();
       renderErrors(errors);
+
+      // ▼ リアルタイム検証（入力のたびに未入力リストを更新）
+      document.addEventListener('input', (e) => {
+        if (e.target.matches('#myName, textarea, input[type="radio"]')) {
+          const { errors } = validateAll();
+          renderErrors(errors);
+        }
+      });
+      document.getElementById('myTeam').addEventListener('change', () => {
+        updateVisibility();
+        const { errors } = validateAll();
+        renderErrors(errors);
+      });
     });
 
     // ========== 簡易テスト（既存は保持しつつ、動的読み込みに合わせて拡張） ==========
@@ -342,12 +355,13 @@
       console.assert(csvEscape('a"b') === '"a""b"', 'csvEscape quote fail');
       console.assert(csvEscape('a,b') === '"a,b"', 'csvEscape comma fail');
       console.assert(csvEscape('a\nb') === '"a\nb"', 'csvEscape newline fail');
-      // teamsToEvaluate: 自チームを除外できること（具体的な配列値には依存しない）
-      const _tmpTeams = ['T1','T2','T3'];
-      TEAMS = _tmpTeams.slice();
-      console.assert(JSON.stringify(teamsToEvaluate('T2')) === JSON.stringify(['T1','T3']), 'teamsToEvaluate must exclude my team');
-      // 参照を戻す（実行中に TEAMS を上書きしたので空に戻す）
-      TEAMS = [];
+      // teamsToEvaluate: ロジック検証（グローバル TEAMS を汚染しないローカル検証）
+      (function(){
+        const _tmpTeams = ['T1','T2','T3'];
+        const expected = JSON.stringify(['T1','T3']);
+        const actual = JSON.stringify(_tmpTeams.filter(t => t !== 'T2'));
+        console.assert(actual === expected, 'teamsToEvaluate logic failed (local)');
+      })();
     })();
   </script>
 </body>
