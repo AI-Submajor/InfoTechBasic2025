@@ -75,8 +75,7 @@
     ];
 
     const HEADER = ["タイムスタンプ","自分の名前","評価対象チーム","観点1","観点2","観点3","観点4","良かった点","改善できる点"];
-    const EOL = "
-"; // Windows/Excel (fixed)
+    const EOL = "\r\n"; // Windows/Excel 互換の改行
 
     function formatTimestamp(){
       const d = new Date();
@@ -288,7 +287,7 @@
         const tKey = teamKey(teamName);
         CRITERIA.forEach(crit => {
           const groupName = `${tKey}_${crit.id}`;
-          const groupEls = $all(`input[type="radio"][name="${groupName}"]`);
+          const groupEls = $all(`input[type=\"radio\"][name=\"${groupName}\"]`);
           const anyChecked = groupEls.some(el => el.checked);
           if(!anyChecked){ ok = false; errors.push(`${teamName} の ${crit.label}`); const parent = groupEls[0]?.closest('.criterion'); setError(parent, true); }
         });
@@ -313,7 +312,7 @@
         const tKey = teamKey(teamName);
         const scores = CRITERIA.map(crit => {
           const groupName = `${tKey}_${crit.id}`;
-          const checked = document.querySelector(`input[type="radio"][name="${groupName}"]:checked`);
+          const checked = document.querySelector(`input[type=\"radio\"][name=\"${groupName}\"]:checked`);
           return checked ? checked.value : '';
         });
         const good = (document.getElementById(`${tKey}_good`)?.value || '').trim();
@@ -362,7 +361,6 @@
         renderErrors(errors);
       }
     });
-      // （不要な重複リスナーを削除済み）
 
     // ========== 簡易テスト（既存は保持しつつ、動的読み込みに合わせて拡張） ==========
     (function runSmokeTests(){
