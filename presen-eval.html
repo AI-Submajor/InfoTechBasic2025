@@ -2,85 +2,115 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
+  <title>相互評価フォーム（ラジオ版）</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>プレゼン評価フォーム</title>
   <style>
-    :root { --gap: 12px; }
-    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", sans-serif; margin: 24px; }
-    h1 { margin-top: 0; }
-    .card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin-bottom: var(--gap); box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
-    fieldset { border: none; padding: 0; margin: 0; }
-    .person { display: grid; grid-template-columns: 1fr; gap: var(--gap); }
-    .row { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
-    .label { font-weight: 600; min-width: 6em; }
-    textarea { width: 100%; min-height: 90px; padding: 8px; border-radius: 8px; border: 1px solid #d1d5db; }
-    .actions { display: flex; gap: 12px; margin-top: 12px; }
-    button { padding: 10px 16px; border-radius: 10px; border: 1px solid #cbd5e1; cursor: pointer; background: #111827; color: #fff; }
-    button.secondary { background: #f8fafc; color: #111827; }
-    .note { color: #6b7280; font-size: 0.92rem; }
-    .required { color: #ef4444; font-weight: 600; margin-left: 6px; font-size: 0.9rem; }
-    @media (min-width: 720px){ .person { grid-template-columns: 1fr 1fr; } }
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Hiragino Sans", "Noto Sans JP", sans-serif; margin: 24px; line-height: 1.6; }
+    h1 { margin-bottom: 4px; }
+    .section { border: 1px solid #ddd; border-radius: 10px; padding: 16px; margin: 16px 0; background: #fafafa; }
+    .team-title { font-weight: 700; font-size: 1.1rem; }
+    .criteria { display: grid; grid-template-columns: 1fr; gap: 8px; }
+    .criterion { border: 1px solid #eee; border-radius: 8px; padding: 10px; background: #fff; }
+    .choices { display: grid; grid-template-columns: 1fr; gap: 6px; margin-top: 6px; }
+    label.choice { display: inline-flex; align-items: center; gap: 8px; }
+    textarea { width: 100%; min-height: 70px; resize: vertical; }
+    input[type="text"], select { width: 100%; padding: 8px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .save { margin-top: 20px; }
+    button { padding: 10px 16px; font-size: 1rem; border: none; border-radius: 8px; background: #0d6efd; color: #fff; cursor: pointer; }
+    button:hover { opacity: 0.95; }
+    .hint { color: #555; font-size: 0.9rem; }
+    .err { outline: 2px solid #e63946; background: #fff3f3; }
+    .muted { color: #666; font-size: 0.9rem; }
+    #errorBox { display:none; border:1px solid #e63946; background:#fff3f3; color:#5b0008; padding:12px; border-radius:8px; margin-top:12px; }
+    #errorBox ul { margin:8px 0 0 20px; }
   </style>
 </head>
 <body>
-  <h1>プレゼン評価フォーム</h1>
-  <p class="note">対象：山本さん / 鈴木さん。評価（A/B/C）とコメントを入力し、保存でCSVをダウンロードします。</p>
+  <h1>相互評価フォーム</h1>
 
-  <form id="evalForm" class="card" onsubmit="event.preventDefault();">
-    <fieldset>
-      <legend style="font-weight:700; margin-bottom: 12px;">評価入力</legend>
+  <div class="section">
+    <label>自分の名前（CSVファイル名に使われます）<br />
+      <input type="text" id="myName" placeholder="氏名を入力" />
+    </label>
+  </div>
 
-      <!-- 山本さん -->
-      <div class="person card" aria-labelledby="y-title">
-        <div class="row" id="y-title"><span class="label">山本さん</span><span class="required">＊評価必須</span></div>
-        <div class="row" role="group" aria-label="山本さんの評価">
-          <label><input type="radio" name="yamamoto_grade" value="A" required> A</label>
-          <label><input type="radio" name="yamamoto_grade" value="B"> B</label>
-          <label><input type="radio" name="yamamoto_grade" value="C"> C</label>
-        </div>
-        <div class="col">
-          <label for="yamamoto_comment" class="label">コメント</label>
-          <textarea id="yamamoto_comment" name="yamamoto_comment" placeholder="良かった点、改善点など"></textarea>
-        </div>
-      </div>
+  <div class="section">
+    <label>自分のチームを選択してください（自チームは評価対象から自動で除外されます）<br />
+      <select id="myTeam">
+        <option value="">選択してください</option>
+        <option value="02_パンダラバース">02_パンダラバース</option>
+        <option value="03_ぐるさん">03_ぐるさん</option>
+        <option value="04_ふりがな必須">04_ふりがな必須</option>
+        <option value="05_平和">05_平和</option>
+      </select>
+    </label>
+    <div class="muted">※ 自分のチームは非表示になり、CSVにも含まれません。</div>
+  </div>
 
-      <!-- 鈴木さん -->
-      <div class="person card" aria-labelledby="s-title">
-        <div class="row" id="s-title"><span class="label">鈴木さん</span><span class="required">＊評価必須</span></div>
-        <div class="row" role="group" aria-label="鈴木さんの評価">
-          <label><input type="radio" name="suzuki_grade" value="A" required> A</label>
-          <label><input type="radio" name="suzuki_grade" value="B"> B</label>
-          <label><input type="radio" name="suzuki_grade" value="C"> C</label>
-        </div>
-        <div class="col">
-          <label for="suzuki_comment" class="label">コメント</label>
-          <textarea id="suzuki_comment" name="suzuki_comment" placeholder="良かった点、改善点など"></textarea>
-        </div>
-      </div>
+  <div id="teamsContainer"></div>
 
-    </fieldset>
-
-    <div class="actions">
-      <button type="button" id="saveBtn">CSVを保存</button>
-      <button type="reset" class="secondary">入力をクリア</button>
-    </div>
-  </form>
+  <div class="save">
+    <button id="saveBtn">CSVで保存</button>
+    <div class="hint">CSV（ヘッダ付き）：自分の名前, 評価対象チーム, 観点1, 観点2, 観点3, 観点4, 良かった点, 改善できる点</div>
+    <div id="saveDialogStatus" class="muted"></div>
+    <div id="errorBox" role="alert" aria-live="polite"></div>
+  </div>
 
   <script>
-    function escapeCSV(value) {
-      if (value == null) return "";
-      const s = String(value).replaceAll('"', '""');
-      // 値にカンマ、改行、引用符が含まれる場合は引用符で囲む
-      if (/[",\n\r]/.test(s)) return '"' + s + '"';
+    // ========== 設定 ==========
+    const TEAMS = ["02_パンダラバース", "03_ぐるさん", "04_ふりがな必須", "05_平和"];    
+    const CRITERIA = [
+      { id: "c1", label: "観点1: ペルソナからの要件整理で現実感がありましたか?" },
+      { id: "c2", label: "観点2: ブランドの絞り込みなどでデータ分析はしっかりしていましたか?" },
+      { id: "c3", label: "観点3: 商品の選択結果と根拠の繋がりの納得感はありましたか? (論理思考)" },
+      { id: "c4", label: "観点4: POPでの訴求は魅力的と感じましたか?" }
+    ];
+
+    const SCALE = [
+      { value: 1, text: "1: 全くそう思わない" },
+      { value: 2, text: "2: あまりそう思わない" },
+      { value: 3, text: "3: どちらかというとそう思う" },
+      { value: 4, text: "4: 非常にそう思う" }
+    ];
+
+    const HEADER = ["自分の名前","評価対象チーム","観点1","観点2","観点3","観点4","良かった点","改善できる点"];
+    const EOL = "\r\n"; // Windows/Excelとの相性を優先（LFにしたい場合は "\n"）
+
+    // ========== ユーティリティ ==========
+    function $(sel, root=document){ return root.querySelector(sel); }
+    function $all(sel, root=document){ return [...root.querySelectorAll(sel)]; }
+
+    function csvEscape(val) {
+      if (val == null) return "";
+      const s = String(val);
+      if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
       return s;
     }
 
-    function downloadCSV(filename, csvText) {
-      // Excel での文字化け防止にBOM付与
-      const BOM = "\uFEFF";
-      const blob = new Blob([BOM + csvText], { type: 'text/csv;charset=utf-8;' });
+    async function downloadCsv(filename, csvText) {
+      const BOM = "\uFEFF"; // Excel向けBOM（可視文字にしない）
+      const blob = new Blob([BOM + csvText], { type: "text/csv;charset=utf-8" });
+
+      const canShowPicker = (typeof window.showSaveFilePicker === 'function') && isSecureContext;
+      if (canShowPicker) {
+        try {
+          const handle = await window.showSaveFilePicker({
+            suggestedName: filename,
+            types: [{ description: 'CSV File', accept: { 'text/csv': ['.csv'] } }]
+          });
+          const writable = await handle.createWritable();
+          await writable.write(blob);
+          await writable.close();
+          return; // ダイアログ経由で保存成功
+        } catch (err) {
+          // ユーザーキャンセルや権限不足など → フォールバック
+        }
+      }
+
+      // フォールバック: アンカー要素でダウンロード（Chrome等では既定のダウンロードフォルダへ自動保存）
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
       a.download = filename;
       document.body.appendChild(a);
@@ -89,46 +119,259 @@
       URL.revokeObjectURL(url);
     }
 
-    function getRadioValue(name) {
-      const el = document.querySelector(`input[name="${name}"]:checked`);
-      return el ? el.value : "";
+    function teamKey(name) {
+      return name.replace(/\s+/g, "_").replace(/[^\w\u00C0-\uFFFF\-]/g, "_");
     }
 
-    function formatDateForFilename(date){
-      const pad = n => String(n).padStart(2, '0');
-      return `${date.getFullYear()}${pad(date.getMonth()+1)}${pad(date.getDate())}_${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
+    function teamsToEvaluate(myTeam) {
+      return TEAMS.filter(t => t !== myTeam);
     }
 
-    document.getElementById('saveBtn').addEventListener('click', () => {
-      const yGrade = getRadioValue('yamamoto_grade');
-      const sGrade = getRadioValue('suzuki_grade');
+    function setError(el, on=true){ if(!el) return; el.classList.toggle('err', !!on); }
 
-      // 必須チェック
-      if (!yGrade || !sGrade) {
-        alert('評価（A/B/C）は両名とも必須です。');
+    function renderErrors(list){
+      const box = document.getElementById("errorBox");
+      if(!box) return;
+      if(!list || list.length === 0){
+        box.style.display = 'none';
+        box.innerHTML = '';
         return;
       }
+      // 明示的に表示（外部CSSの影響を受けにくくする）
+      box.style.display = 'block';
+      const items = list.map(s => `<li>${s}</li>`).join('');
+      box.innerHTML = `<strong>未入力/未選択があります（${list.length}件）:</strong><ul>${items}</ul>`;
+      const firstErr = document.querySelector('.err');
+      if(firstErr){ firstErr.scrollIntoView({behavior:'smooth', block:'center'}); }
+    }
 
-      const yComment = document.getElementById('yamamoto_comment').value.trim();
-      const sComment = document.getElementById('suzuki_comment').value.trim();
 
-      const now = new Date();
-      const timestamp = now.toLocaleString('ja-JP');
+    // ========== 画面生成 ==========
+    const container = document.getElementById("teamsContainer");
 
-      // CSV作成（ヘッダー + 2行）
-      const headers = ['名前','評価','コメント','保存日時'];
-      const rows = [
-        ['山本さん', yGrade, yComment, timestamp],
-        ['鈴木さん', sGrade, sComment, timestamp]
-      ];
+    TEAMS.forEach(teamName => {
+      const tKey = teamKey(teamName);
+      const section = document.createElement("div");
+      section.className = "section";
+      section.dataset.team = teamName;
 
-      const csv = [headers, ...rows]
-        .map(row => row.map(escapeCSV).join(','))
-        .join('\n');
+      const header = document.createElement("div");
+      header.className = "team-title";
+      header.textContent = `評価対象チーム：${teamName}`;
+      section.appendChild(header);
 
-      const filename = `presentation_evaluation_${formatDateForFilename(now)}.csv`;
-      downloadCSV(filename, csv);
+      const criteriaDiv = document.createElement("div");
+      criteriaDiv.className = "criteria";
+
+      CRITERIA.forEach(crit => {
+        const critWrap = document.createElement("div");
+        critWrap.className = "criterion";
+
+        const label = document.createElement("div");
+        label.textContent = crit.label;
+        critWrap.appendChild(label);
+
+        const choices = document.createElement("div");
+        choices.className = "choices";
+
+        const groupName = `${tKey}_${crit.id}`;
+        SCALE.forEach(sc => {
+          const id = `${groupName}_${sc.value}`;
+          const input = document.createElement("input");
+          input.type = "radio";
+          input.id = id;
+          input.name = groupName;
+          input.value = sc.value;
+
+          const lab = document.createElement("label");
+          lab.className = "choice";
+          lab.setAttribute("for", id);
+          lab.appendChild(input);
+          const span = document.createElement("span");
+          span.textContent = sc.text;
+          lab.appendChild(span);
+
+          choices.appendChild(lab);
+        });
+
+        critWrap.appendChild(choices);
+        criteriaDiv.appendChild(critWrap);
+      });
+
+      const comments = document.createElement("div");
+      comments.className = "grid-2";
+      comments.innerHTML = `
+        <label>良かった点（コメント）<textarea id="${tKey}_good"></textarea></label>
+        <label>改善できる点（コメント）<textarea id="${tKey}_improve"></textarea></label>`;
+
+      section.appendChild(criteriaDiv);
+      section.appendChild(comments);
+      container.appendChild(section);
     });
+
+    function updateVisibility(){
+      const myTeam = document.getElementById("myTeam").value;
+      $all('[data-team]').forEach(sec => {
+        sec.style.display = (myTeam && sec.dataset.team === myTeam) ? 'none' : '';
+      });
+    }
+
+    document.getElementById("myTeam").addEventListener('change', updateVisibility);
+    updateVisibility();
+
+    function validateAll(){
+      let ok = true;
+      const errors = [];
+      // reset decorations only
+      setError(document.getElementById("myName"), false);
+      setError(document.getElementById("myTeam"), false);
+      $all('.criterion, textarea').forEach(el => setError(el, false));
+
+      const myName = (document.getElementById("myName").value || '').trim();
+      const myTeam = document.getElementById("myTeam").value;
+      if(!myName){ ok = false; errors.push('自分の名前'); setError(document.getElementById("myName"), true); }
+      if(!myTeam){ ok = false; errors.push('自分のチーム'); setError(document.getElementById("myTeam"), true); }
+
+      const targets = teamsToEvaluate(myTeam);
+      targets.forEach(teamName => {
+        const tKey = teamKey(teamName);
+        // radios required
+        CRITERIA.forEach(crit => {
+          const groupName = `${tKey}_${crit.id}`;
+          const groupEls = $all(`input[type="radio"][name="${groupName}"]`);
+          const anyChecked = groupEls.some(el => el.checked);
+          if(!anyChecked){
+            ok = false;
+            errors.push(`${teamName} の ${crit.label}`);
+            const parent = groupEls[0]?.closest('.criterion');
+            setError(parent, true);
+          }
+        });
+        // comments required (IDに日本語や数字が入るので querySelector ではなく getElementById を使用)
+        const good = document.getElementById(`${tKey}_good`);
+        const improve = document.getElementById(`${tKey}_improve`);
+        if(!good.value.trim()){ ok = false; errors.push(`${teamName} の 良かった点`); setError(good, true); }
+        if(!improve.value.trim()){ ok = false; errors.push(`${teamName} の 改善できる点`); setError(improve, true); }
+      });
+
+      return { ok, errors, myName, myTeam, targets };
+    }
+
+    // ========== CSV 生成 ==========
+    document.getElementById("saveBtn").addEventListener("click", async () => {
+      const { ok, errors, myName, myTeam, targets } = validateAll();
+      // always render errors first
+      renderErrors(errors);
+      if(!ok){ return; }
+
+      const lines = [];
+      // header
+      lines.push(HEADER.map(csvEscape).join(","));
+
+      targets.forEach(teamName => {
+        const tKey = teamKey(teamName);
+        const scores = CRITERIA.map(crit => {
+          const groupName = `${tKey}_${crit.id}`;
+          const checked = document.querySelector(`input[type="radio"][name="${groupName}"]:checked`);
+          return checked ? checked.value : "";
+        });
+        const good = (document.getElementById(`${tKey}_good`)?.value || "").trim();
+        const improve = (document.getElementById(`${tKey}_improve`)?.value || "").trim();
+
+        const row = [
+          myName,
+          teamName,
+          ...scores,
+          good,
+          improve
+        ].map(csvEscape).join(",");
+
+        lines.push(row);
+      });
+
+      // Use explicit EOL to avoid broken newline literals
+      const csv = lines.join(EOL);
+      const filename = `相互評価(${myName}).csv`;
+      await downloadCsv(filename, csv);
+      renderErrors([]);
+    });
+
+    function updateSaveDialogStatus(){
+      const el = document.getElementById('saveDialogStatus');
+      if(!el) return;
+      const canShowPicker = (typeof window.showSaveFilePicker === 'function') && isSecureContext;
+      if (canShowPicker) {
+        el.textContent = '保存時は毎回ダイアログが表示されます（対応ブラウザ・セキュア環境）。';
+      } else {
+        el.innerHTML = `現在のプレビュー環境では毎回の保存ダイアログを表示できません。<br>
+          次のいずれかでご利用ください：
+          <ol style="margin:6px 0 0 18px;">
+            <li>ローカル開発サーバで開く（例：<code>http://localhost</code>）。</li>
+            <li>GitHub Pages などの <code>https://</code> でホストする。</li>
+            <li>Chrome 設定→ダウンロード→「ダウンロード前に各ファイルの保存場所を確認する」をONにする（フォールバック時）。</li>
+          </ol>`;
+      }
+    }
+
+    updateSaveDialogStatus();
+
+    // live error updates
+    document.addEventListener('input', (e) => {
+      if (e.target.matches('#myName, #myTeam, textarea, input[type="radio"]')) {
+        const { errors } = validateAll();
+        renderErrors(errors);
+      }
+    });
+    document.addEventListener('change', (e) => {
+      if (e.target.matches('#myTeam')) {
+        updateVisibility();
+        const { errors } = validateAll();
+        renderErrors(errors);
+      }
+    });
+
+    // 初期表示時にもエラー一覧を明示的に描画（見落とし防止）
+    (function initialRender(){
+      const { errors } = validateAll();
+      renderErrors(errors);
+    })();
+
+    // ========== 簡易テスト（開発用） ==========
+    (function runSmokeTests(){
+      // 行結合（既存テスト維持）
+      const sample = ["a,b", "c,d"]; 
+      const lf = sample.join("\n");
+      const crlf = sample.join("\r\n");
+      console.assert(lf === "a,b\nc,d", "LF join failed");
+      console.assert(crlf === "a,b\r\nc,d", "CRLF join failed");
+      // CSVエスケープ（既存テスト維持）
+      console.assert(csvEscape('a"b') === '"a""b"', 'csvEscape quote fail');
+      console.assert(csvEscape('a,b') === '"a,b"', 'csvEscape comma fail');
+      console.assert(csvEscape('a\nb') === '"a\nb"', 'csvEscape newline fail');
+      // ヘッダ行の先頭要素確認（既存テスト維持）
+      console.assert(HEADER[0] === '自分の名前', 'HEADER first column mismatch');
+      // 自チーム除外ロジック（既存テスト維持）
+      console.assert(JSON.stringify(teamsToEvaluate('03_ぐるさん')) === JSON.stringify(["02_パンダラバース","04_ふりがな必須","05_平和"]) , 'teamsToEvaluate failed');
+
+      // 追加テスト: EOL を使った結合が想定通りか
+      const joinWithEOL = ["x","y"].join(EOL);
+      console.assert(joinWithEOL === `x${EOL}y`, 'EOL join mismatch');
+      // 追加テスト: 日本語と数字を含むIDが getElementById で取得できるか
+      const tKey = teamKey('03_ぐるさん');
+      const goodEl = document.getElementById(`${tKey}_good`);
+      const improveEl = document.getElementById(`${tKey}_improve`);
+      console.assert(!!goodEl && !!improveEl, 'getElementById failed for non-ASCII/leading-digit IDs');
+      // 追加テスト: renderErrors の表示/非表示トグル
+      renderErrors(['test']);
+      console.assert(document.getElementById('errorBox').style.display !== 'none', 'renderErrors should show box');
+      renderErrors([]);
+      console.assert(document.getElementById('errorBox').style.display === 'none', 'renderErrors should hide box');
+      // 追加テスト: downloadCsv が async 関数であること（await 使用の安全性）
+      console.assert(typeof downloadCsv === 'function' && downloadCsv.constructor.name === 'AsyncFunction', 'downloadCsv must be async');
+      // 追加テスト: validateAll が初期状態でエラーを検出すること（必須チェックの回帰防止）
+      const init = validateAll();
+      console.assert(init.ok === false && Array.isArray(init.errors) && init.errors.length > 0, 'validateAll should report errors when empty');
+    })();
   </script>
 </body>
 </html>
