@@ -29,7 +29,7 @@
   </style>
 </head>
 <body>
-  <h1>相互評価フォーム</h1>
+  <h1 id="pageTitle">相互評価フォーム</h1>
 
   <div id="loadStatus" class="muted">データを読み込み中…</div>
   <div class="muted">クラス切替：URL に <span class="kbd">?match=class-a</span> のように指定（既定：<span class="kbd">class-all</span>）。</div>
@@ -317,6 +317,14 @@
 
     // ========== 初期化 ==========
     updateSaveDialogStatus();
+    // タイトルに (match) を追加
+    (function(){
+      const p = new URLSearchParams(location.search);
+      const key = (p.get('match') || 'class-all').toLowerCase();
+      const titleEl = document.getElementById('pageTitle');
+      if(titleEl) titleEl.textContent = `相互評価フォーム(${key})`;
+    })();
+
     initData().then(() => {
       const { errors } = validateAll();
       renderErrors(errors);
