@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>予測結果 発表（forecast）</title>
+  <style>
+    body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,"Hiragino Sans","Noto Sans JP",sans-serif;margin:24px;line-height:1.6;}
+    h1{margin:0 0 8px;}
+    .muted{color:#666;font-size:0.9rem;}
+    .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;}
+    .card{border:1px solid #ddd;border-radius:12px;padding:14px;background:#fafafa;margin:14px 0;}
+    table{border-collapse:collapse;width:100%;background:#fff;border:1px solid #eee;border-radius:12px;overflow:hidden;}
+    th,td{border-bottom:1px solid #eee;padding:10px;text-align:left;}
+    th{background:#f6f6f6;}
+    tr:last-child td{border-bottom:none;}
+    .right{text-align:right;}
+    .crown{font-size:1.1rem;}
+    .pill{display:inline-block;border:1px solid #ddd;border-radius:999px;padding:2px 10px;background:#fff;font-size:0.9rem;}
+    .error{border:1px solid #e63946;background:#fff3f3;color:#5b0008;border-radius:12px;padding:12px;}
+    input{padding:8px;border-radius:8px;border:1px solid #ddd;}
+    button{padding:9px 14px;border-radius:10px;border:none;background:#0d6efd;color:#fff;cursor:pointer;}
+    button:disabled{opacity:.6;cursor:not-allowed;}
+    .chartBox{position: relative; height: 360px; background:#fff; border:1px solid #eee; border-radius:12px; padding:10px;}
+    .chartBox canvas{width:100% !important; height:100% !important;}
+  </style>
+</head>
+<body>
+  <h1>予測結果 発表</h1>
+  <div class="row muted">
+    <span class="pill" id="sheetInfo">読み込み中…</span>
+    <span class="pill">参照: forecast シート</span>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <label class="muted">match で絞り込み（任意）
+        <input id="matchFilter" placeholder="例: class-a（空欄で全体）" />
+      </label>
+      <button id="reloadBtn">再読み込み</button>
+      <span class="muted" id="status"></span>
+    </div>
+    <div class="muted" style="margin-top:6px;">※ forecast に match 列が無い場合は無視されます。</div>
+  </div>
+
+  <div id="err" class="error" style="display:none"></div>
+
+  <div class="card">
+    <h2 style="margin:0 0 10px;">(1) 予測値と実績値（表）</h2>
+    <div id="tableWrap"></div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin:0 0 10px;">(2) 差違（予測−実績）の棒グラフ</h2>
+    <div class="chartBox"><canvas id="diffChart"></canvas></div>
+    <div class="muted" style="margin-top:8px;">※ 0 を基準線として、プラス/マイナス方向に棒が伸びます（マイナスは色を変えます）。</div>
+  </div>
+
+  <!-- Chart.js (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@latest/dist/chart.umd.min.js"></script>
+  <script>
+    // ====== 設定 ======
+    const SPREADSHEET_ID = '1CZWOCDTm-UJz7yyPgiPcUzMnLyja80FgCGGP6E72FQ4';
+    const SHEET_NAME = 'forecast';
+    const CSV_URL_BASE = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(SHEET_NAME)}`;
+
+    // ====== CSV パーサ（簡易・引用符対応） ======
+    function parseCSV(text){
+      const rows = [];
+      let row = [];
+      let cur = '';
+      let inQuotes = false;
+      for(let i=0;i<text.length;i++){
+        const ch = text[i];
+        const next = text[i+1];
+        if(inQuotes){
+          if(ch === '"' && next === '"'){ cur += '"'; i++; continue; }
+          if(ch === '"'){ inQuotes = false; continue; }
+          cur += ch;
+        }else{
+          if(ch === '"'){ inQuotes = true; continue; }
+          if(ch === ','){ row.push(cur); cur=''; continue; }
+          if(ch === '\n'){
+            row.push(cur); cur='';
+            if(row.some(v => String(v).trim() !== '')) rows.push(row);
+            row = [];
+            continue;
+          }
+          if(ch === '\r'){ continue; }
+          cur += ch;
+        }
+      }
+      row.push(cur);
+      if(row.some(v => String(v).trim() !== '')) rows.push(row);
+      return rows;
+    }
+
+    function normalizeHeader(h){
+      return String(h ?? '').trim().replace(/^\uFEFF/, '');
+    }
+
+    function toNumber(v){
+      const s = String(v ?? '').trim();
+      if(!s) return NaN;
+      // カンマ区切りにも対応（例: 1,234）
+      const n = Number(s.replace(/,/g,''));
+      return Number.isFinite(n) ? n : NaN;
+    }
+
+    function showError(msg){
+      const el = document.getElementById('err');
+      el.style.display = '';
+      el.textContent = msg;
+    }
+    function clearError(){
+      const el = document.getElementById('err');
+      el.style.display = 'none';
+      el.textContent = '';
+    }
+
+    // ====== 列推定（ヘッダ追従） ======
+    function inferColumns(headers){
+      const find = (cands) => {
+        for(const c of cands){
+          const idx = headers.findIndex(h => h === c);
+          if(idx >= 0) return idx;
+        }
+        return -1;
+      };
+
+      const teamCol = find(['チーム名','チーム','team','Team','評価対象チーム']);
+      const forecastCol = find(['予測値','予測','forecast','Forecast']);
+      const actualCol = find(['実績値','実績','actual','Actual']);
+      const diffCol = find(['差違','差分','diff','Diff']);
+      const matchCol = headers.findIndex(h => h.toLowerCase() === 'match');
+
+      // 最低限: チーム名・予測値・実績値
+      return { teamCol, forecastCol, actualCol, diffCol, matchCol };
+    }
+
+    function buildData(rows, matchFilter){
+      if(rows.length < 2) throw new Error('forecast シートにデータがありません（ヘッダ1行＋データ行が必要）');
+      const headers = rows[0].map(normalizeHeader);
+      const { teamCol, forecastCol, actualCol, diffCol, matchCol } = inferColumns(headers);
+
+      if(teamCol < 0) throw new Error('チーム名の列が見つかりません（例: チーム名 / チーム）。');
+      if(forecastCol < 0) throw new Error('予測値の列が見つかりません（例: 予測値）。');
+      if(actualCol < 0) throw new Error('実績値の列が見つかりません（例: 実績値）。');
+
+      const data = [];
+      for(let r=1;r<rows.length;r++){
+        const row = rows[r];
+        const team = String(row[teamCol] ?? '').trim();
+        if(!team) continue;
+
+        if(matchFilter && matchCol >= 0){
+          const m = String(row[matchCol] ?? '').trim();
+          if(m !== matchFilter) continue;
+        }
+
+        const forecast = toNumber(row[forecastCol]);
+        const actual = toNumber(row[actualCol]);
+        if(!Number.isFinite(forecast) || !Number.isFinite(actual)) continue;
+
+        let diff = Number.isFinite(toNumber(row[diffCol])) ? toNumber(row[diffCol]) : (forecast - actual);
+        if(!Number.isFinite(diff)) diff = forecast - actual;
+
+        data.push({ team, forecast, actual, diff, absDiff: Math.abs(diff) });
+      }
+
+      // 実績値は全行同じ想定：代表値を拾う（混在していたら最頻値で表示）
+      const actualVals = data.map(d => d.actual);
+      let actualValue = NaN;
+      if(actualVals.length){
+        const map = new Map();
+        for(const v of actualVals){ map.set(v, (map.get(v) || 0) + 1); }
+        actualValue = [...map.entries()].sort((a,b)=>b[1]-a[1])[0][0];
+      }
+
+      // 最小絶対差の勝者（同率は複数）
+      let winners = new Set();
+      if(data.length){
+        const min = Math.min(...data.map(d => d.absDiff));
+        const eps = 1e-9;
+        winners = new Set(data.filter(d => Math.abs(d.absDiff - min) <= eps).map(d => d.team));
+      }
+
+      return { headers, data, winners, actualValue };
+    }
+
+    // ====== 描画 ======
+    let diffChart = null;
+    function destroyChart(){
+      if(diffChart){ diffChart.destroy(); diffChart = null; }
+    }
+
+    function renderTable(data, winners, actualValue){
+      const wrap = document.getElementById('tableWrap');
+      if(!data.length){
+        wrap.innerHTML = '<div class="muted">（表示できるデータがありません）</div>';
+        return;
+      }
+
+      const sorted = [...data].sort((a,b)=>a.absDiff-b.absDiff);
+
+      const rowsHtml = sorted.map((d) => {
+        const crown = winners.has(d.team) ? '👑' : '';
+        return `
+          <tr>
+            <td>${d.team} <span class="crown">${crown}</span></td>
+            <td class="right">${d.forecast.toLocaleString()}</td>
+            <td class="right">${d.actual.toLocaleString()}</td>
+            <td class="right">${d.diff.toLocaleString()}</td>
+            <td class="right">${d.absDiff.toLocaleString()}</td>
+          </tr>
+        `;
+      }).join('');
+
+      const actualNote = Number.isFinite(actualValue) ? `実績値（共通）: ${actualValue.toLocaleString()}` : '実績値（共通）: -';
+
+      wrap.innerHTML = `
+        <div class="muted" style="margin-bottom:8px;">${actualNote} / 👑 = |差違| が最小（同率は複数）</div>
+        <table>
+          <thead>
+            <tr>
+              <th>チーム</th>
+              <th class="right">予測値</th>
+              <th class="right">実績値</th>
+              <th class="right">差違（予測−実績）</th>
+              <th class="right">|差違|</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      `;
+    }
+
+    function renderDiffChart(data){
+      destroyChart();
+      const ctx = document.getElementById('diffChart').getContext('2d');
+      if(!data.length){
+        return;
+      }
+
+      // チーム名は表と同じ順（|差違| 小さい順）で並べる
+      const sorted = [...data].sort((a,b)=>a.absDiff-b.absDiff);
+      const labels = sorted.map(d => d.team);
+      const diffs = sorted.map(d => d.diff);
+
+      // マイナスだけ色を変える（Chart.js は data ごとに色配列を渡せる）
+      const bg = diffs.map(v => v < 0 ? 'rgba(220,53,69,0.7)' : 'rgba(13,110,253,0.7)');
+      const border = diffs.map(v => v < 0 ? 'rgba(220,53,69,1)' : 'rgba(13,110,253,1)');
+
+      diffChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: '差違（予測−実績）',
+            data: diffs,
+            backgroundColor: bg,
+            borderColor: border,
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { enabled: true }
+          },
+          scales: {
+            y: {
+              beginAtZero: false,
+              // 0 基準線を分かりやすく
+              grid: {
+                color: (ctx) => (ctx.tick && ctx.tick.value === 0) ? 'rgba(0,0,0,0.35)' : 'rgba(0,0,0,0.08)'
+              }
+            }
+          }
+        }
+      });
+    }
+
+    async function loadAndRender(){
+      clearError();
+      const status = document.getElementById('status');
+      const btn = document.getElementById('reloadBtn');
+      const matchFilter = document.getElementById('matchFilter').value.trim();
+
+      try{
+        btn.disabled = true;
+        status.textContent = '読み込み中…';
+
+        const url = CSV_URL_BASE + `&v=${Date.now()}`;
+        const res = await fetch(url, { cache: 'no-store' });
+        if(!res.ok) throw new Error(`CSV取得に失敗しました（HTTP ${res.status}）。シートの共有設定（閲覧可）を確認してください。`);
+        const text = await res.text();
+
+        const rows = parseCSV(text);
+        const built = buildData(rows, matchFilter);
+
+        document.getElementById('sheetInfo').textContent = `チーム数: ${built.data.length}`;
+
+        renderTable(built.data, built.winners, built.actualValue);
+        renderDiffChart(built.data);
+
+        status.textContent = '完了';
+      }catch(err){
+        showError(String(err && err.message ? err.message : err));
+        status.textContent = 'エラー';
+      }finally{
+        btn.disabled = false;
+      }
+    }
+
+    document.getElementById('reloadBtn').addEventListener('click', loadAndRender);
+    loadAndRender();
+  </script>
+</body>
+</html>
