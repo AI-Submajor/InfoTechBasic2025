@@ -172,16 +172,9 @@ function buildHeader(){
     function splitLines(text){
   // 正規表現リテラルを避け、改行コード差異（CRLF/LF/CR）を安全に吸収
   const s = String(text ?? "");
-  // ここは「
-」「
-」を文字として扱う（実改行を入れない）
-  const normalized = s.replaceAll("
-", "
-").replaceAll("
-", "
-");
-  return normalized.split("
-").map(v => v.trim()).filter(Boolean);
+  // ここは「\r\n」「\r」「\n」を文字として扱う（実改行を入れない）
+  const normalized = s.replaceAll("\r\n", "\n").replaceAll("\r", "\n");
+  return normalized.split("\n").map(v => v.trim()).filter(Boolean);
 }
 
 async function loadLinesFile(path){
