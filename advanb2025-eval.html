@@ -61,12 +61,23 @@
 
   <script>
     // ================= 共通設定 =================
-    // このHTMLファイルの版（キャッシュ確認用）
-    // ※新しい版をアップロードしたら、この値も更新してください。
-    // ※アップロードのたびに更新してください（キャッシュ確認用）
-    const BUILD_ID = "2026-01-18T12:00:00+09:00";
-    // ページを開いた時刻（キャッシュ判定ではなく、表示確認用）
+    // ページを開いた時刻（表示確認用）
     const LOADED_AT = formatTimestamp(new Date());
+
+    // デプロイ版の識別子（キャッシュ/反映確認用）
+    // GitHub Pages 等では、同一オリジンの HEAD を叩いて Last-Modified を取得できることがあります。
+    // 取れた場合は、それを「版」の目安として表示・送信に使います（手作業でBUILD_IDを更新しなくてOK）。
+    let BUILD_ID = 'unknown';
+    async function initBuildId(){
+      try{
+        const res = await fetch(location.href, { method: 'HEAD', cache: 'no-store' });
+        const lm = res.headers.get('Last-Modified');
+        if(lm){
+          const d = new Date(lm);
+          if(!isNaN(d.getTime())) BUILD_ID = d.toISOString();
+        }
+      }catch(_){ /* ignore */ }
+    }
 
     // Google Apps Script Webアプリ（results へ追記）
     const GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwuKpoc03JqDKGh2w3Wi7DQ74B6QLnVvoNiH568AzFaP9j6_JQaVEsszarO7odSw30L/exec";
@@ -369,12 +380,13 @@
     }
 
     // ================== 初期化 ==================
-    (function(){
+    function setPageTitle(){
       const key = getMatchKey();
+      const title = `相互評価フォーム(${key}) [deployed ${BUILD_ID} / loaded ${LOADED_AT}]`;
       const titleEl = document.getElementById('pageTitle');
-      if(titleEl) titleEl.textContent = `相互評価フォーム(${key}) [build ${BUILD_ID} / loaded ${LOADED_AT}]`;
-      document.title = `相互評価フォーム(${key}) [build ${BUILD_ID} / loaded ${LOADED_AT}]`;
-    })();
+      if(titleEl) titleEl.textContent = title;
+      document.title = title;
+    }
 
     async function initData(){
       const status = document.getElementById('loadStatus');
@@ -481,10 +493,13 @@
     });
 
     // 起動
-    initData().then(() => {
+    (async () => {
+      await initBuildId();
+      setPageTitle();
+      await initData();
       const { errors } = validateAll();
       renderErrors(errors);
-    });
+    })();
   </script>
 </body>
 </html>
