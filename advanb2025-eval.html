@@ -61,7 +61,7 @@
   <script>
     // ================= 共通設定 =================
 // 観点は外部設定ファイルから読み込みます（1行=1観点テキスト）
-// 例: ./setting/eval-ponts.txt
+// 例: ./setting/eval-points.txt
 let CRITERIA = [];
 
 const DEFAULT_CRITERIA = [
@@ -168,7 +168,24 @@ function buildHeader(){
   const res = await fetch(path);
   if(!res.ok) throw new Error(`ファイル読込エラー: ${path}`);
   const text = await res.text();
-  return [...new Set(text.split(/\r?\n/).map(s => s.trim()).filter(Boolean))];
+  return [...new Set(text.split(/
+?
+/).map(s => s.trim()).filter(Boolean))];
+}
+
+function readLinesFromFile(file){
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onerror = () => reject(new Error('ファイルの読み込みに失敗しました'));
+    r.onload = () => {
+      const text = String(r.result ?? '');
+      const lines = [...new Set(text.split(/
+?
+/).map(s => s.trim()).filter(Boolean))];
+      resolve(lines);
+    };
+    r.readAsText(file, 'utf-8');
+  });
 }
 
 async function loadTeamFile(basename){
@@ -176,11 +193,11 @@ async function loadTeamFile(basename){
 }
 
 async function loadCriteria(){
-  // 仕様: ./setting/eval-ponts.txt を読み、1行=1観点テキスト
+  // 仕様: ./setting/eval-points.txt を読み、1行=1観点テキスト
   // ファイルが読めない場合はエラー表示し、既定観点にフォールバック（授業停止を避ける）
   try{
-    const lines = await loadLinesFile('./setting/eval-ponts.txt');
-    if(lines.length === 0) throw new Error('観点設定ファイルが空です（setting/eval-ponts.txt）');
+    const lines = await loadLinesFile('./setting/eval-points.txt');
+    if(lines.length === 0) throw new Error('観点設定ファイルが空です（setting/eval-points.txt）');
     CRITERIA = lines.map((t, i) => ({ id: `c${i+1}`, label: `観点${i+1}: ${t}` }));
   }catch(err){
     // フォールバック
@@ -213,49 +230,105 @@ async function loadCriteria(){
     // 観点を先に読み込み（画面生成・CSVヘッダ生成に必要）
     await loadCriteria();
 
+    // file:// の場合は fetch で data/ を読めないことが多いので、ファイル選択UIへ誘導
+    if(location.protocol === 'file:'){
+      status.innerHTML = `ローカル（file://）で開かれているため <span class="kbd">fetch('./data/...')</span> が使えない環境です。<br>
+      下の「ローカル実行用：設定/データを選択」から <b>class-all.txt</b> と <b>${matchKey}.txt</b> を選択してください。`;
+      showLocalPickers(matchKey);
+      return;
+    }
+
     status.textContent = `チームリスト読込: ${matchKey}.txt`;
 
-    // 必要ファイル読込
     [ALL_TEAMS, TEAMS] = await Promise.all([
       loadTeamFile('class-all'),
       loadTeamFile(matchKey)
     ]);
 
-    // myTeam セレクト構築（ALL_TEAMS）
     const sel = document.getElementById('myTeam');
     sel.innerHTML = '<option value="">選択してください</option>' +
       ALL_TEAMS.map(n => `<option value="${n}">${n}</option>`).join('');
 
-    // 画面生成（TEAMS）
     buildTeamSections(TEAMS);
     updateVisibility();
     status.textContent = `読み込み完了（対象 ${TEAMS.length} チーム / 全チーム ${ALL_TEAMS.length} / 観点 ${CRITERIA.length}）`;
   }catch(err){
     status.textContent = `読み込み失敗: ${err.message}`;
   }
-}.txt`;
+}
 
-        // 必要ファイル読込
-        [ALL_TEAMS, TEAMS] = await Promise.all([
-          loadTeamFile('class-all'),
-          loadTeamFile(matchKey)
-        ]);
+// ================== ローカル実行（file://）用：ファイル選択UI ==================
+function ensureLocalPickerUI(){
+  if(document.getElementById('localPickerSection')) return;
+  const anchor = document.getElementById('teamsContainer');
+  const sec = document.createElement('div');
+  sec.className = 'section';
+  sec.id = 'localPickerSection';
+  sec.style.display = 'none';
+  sec.innerHTML = `
+    <div class="team-title">ローカル実行用：設定/データを選択</div>
+    <div class="muted">file:// で開く場合、ブラウザの制約で data/ や setting/ を fetch できないことがあります。その場合はここから読み込んでください。</div>
+    <div style="margin-top:10px;" class="grid-2">
+      <label>全チーム一覧（data/class-all.txt）<br><input type="file" id="pickAllTeams" accept=".txt,text/plain" /></label>
+      <label>評価対象一覧（data/<span id="matchNameHere"></span>.txt）<br><input type="file" id="pickMatchTeams" accept=".txt,text/plain" /></label>
+    </div>
+    <div style="margin-top:10px;">
+      <label>観点設定（setting/eval-points.txt）<span class="muted">（任意：未選択なら既定観点を使用）</span><br>
+        <input type="file" id="pickCriteria" accept=".txt,text/plain" />
+      </label>
+    </div>
+    <div style="margin-top:12px;">
+      <button id="applyLocalFiles" type="button">このファイルで開始</button>
+      <span id="localApplyStatus" class="muted" style="margin-left:10px;"></span>
+    </div>
+  `;
+  anchor.parentNode.insertBefore(sec, anchor);
+}
 
-        // myTeam セレクト構築（ALL_TEAMS）
-        const sel = document.getElementById('myTeam');
-        sel.innerHTML = '<option value="">選択してください</option>' +
-          ALL_TEAMS.map(n => `<option value="${n}">${n}</option>`).join('');
+function showLocalPickers(matchKey){
+  ensureLocalPickerUI();
+  const sec = document.getElementById('localPickerSection');
+  sec.style.display = '';
+  document.getElementById('matchNameHere').textContent = matchKey;
 
-        // 画面生成（TEAMS）
-        buildTeamSections(TEAMS);
-        updateVisibility();
-        status.textContent = `読み込み完了（対象 ${TEAMS.length} チーム / 全チーム ${ALL_TEAMS.length}）`;
-      }catch(err){
-        status.textContent = `読み込み失敗: ${err.message}`;
+  document.getElementById('applyLocalFiles').onclick = async () => {
+    const st = document.getElementById('localApplyStatus');
+    st.textContent = '読み込み中…';
+    try{
+      const fAll = document.getElementById('pickAllTeams').files?.[0];
+      const fMatch = document.getElementById('pickMatchTeams').files?.[0];
+      const fCrit = document.getElementById('pickCriteria').files?.[0];
+      if(!fAll) throw new Error('class-all.txt を選択してください');
+      if(!fMatch) throw new Error(`${matchKey}.txt を選択してください`);
+
+      if(fCrit){
+        const lines = await readLinesFromFile(fCrit);
+        if(lines.length === 0) throw new Error('観点設定ファイルが空です（eval-points.txt）');
+        CRITERIA = lines.map((t, i) => ({ id: `c${i+1}`, label: `観点${i+1}: ${t}` }));
+        buildHeader();
+        const hint = document.querySelector('.hint');
+        if(hint) hint.textContent = `CSV（ヘッダ付き）：${HEADER.join(', ')}`;
       }
-    }
 
-    // ================== 画面生成 ==================
+      ALL_TEAMS = await readLinesFromFile(fAll);
+      TEAMS = await readLinesFromFile(fMatch);
+
+      const sel = document.getElementById('myTeam');
+      sel.innerHTML = '<option value="">選択してください</option>' +
+        ALL_TEAMS.map(n => `<option value="${n}">${n}</option>`).join('');
+
+      buildTeamSections(TEAMS);
+      updateVisibility();
+
+      document.getElementById('loadStatus').textContent = `読み込み完了（ローカル）：対象 ${TEAMS.length} チーム / 全チーム ${ALL_TEAMS.length} / 観点 ${CRITERIA.length}`;
+      st.textContent = 'OK';
+    }catch(err){
+      st.textContent = `失敗: ${err.message}`;
+    }
+  };
+}
+
+// ================== 画面生成 ==================
     function buildTeamSections(teams){
   const container = document.getElementById('teamsContainer');
   container.innerHTML = '';
