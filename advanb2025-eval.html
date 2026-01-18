@@ -60,12 +60,16 @@
 
   <script>
     // ================= 共通設定 =================
-    const CRITERIA = [
-      { id: "c1", label: "観点1: ペルソナからの要件整理で現実感がありましたか?" },
-      { id: "c2", label: "観点2: ブランドの絞り込みなどでデータ分析はしっかりしていましたか?" },
-      { id: "c3", label: "観点3: 商品の選択結果と根拠の繋がりの納得感はありましたか? (論理思考)" },
-      { id: "c4", label: "観点4: POPでの訴求は魅力的と感じましたか?" }
-    ];
+// 観点は外部設定ファイルから読み込みます（1行=1観点テキスト）
+// 例: ./setting/eval-ponts.txt
+let CRITERIA = [];
+
+const DEFAULT_CRITERIA = [
+  "ペルソナからの要件整理で現実感がありましたか?",
+  "ブランドの絞り込みなどでデータ分析はしっかりしていましたか?",
+  "商品の選択結果と根拠の繋がりの納得感はありましたか? (論理思考)",
+  "POPでの訴求は魅力的と感じましたか?"
+];
 
     const SCALE = [
       { value: 1, text: "1: 全くそう思わない" },
@@ -74,7 +78,11 @@
       { value: 4, text: "4: 非常にそう思う" }
     ];
 
-    const HEADER = ["タイムスタンプ","自分の名前","評価対象チーム","観点1","観点2","観点3","観点4","良かった点","改善できる点"];
+    let HEADER = []; // CRITERIA 読み込み後に動的生成
+function buildHeader(){
+  const critCols = CRITERIA.map((_, i) => `観点${i+1}`);
+  HEADER = ["タイムスタンプ","自分の名前","評価対象チーム", ...critCols, "良かった点","改善できる点"];
+}
     const EOL = "\r\n"; // Windows/Excel 互換の改行
 
     function formatTimestamp(){
@@ -156,12 +164,37 @@
     }
 
     // ================== データ読み込み（match パラメータ） ==================
-    async function loadTeamFile(basename){
-      const res = await fetch(`./data/${basename}.txt`);
-      if(!res.ok) throw new Error(`ファイル読込エラー: ${basename}.txt`);
-      const text = await res.text();
-      return [...new Set(text.split(/\r?\n/).map(s => s.trim()).filter(Boolean))];
-    }
+    async function loadLinesFile(path){
+  const res = await fetch(path);
+  if(!res.ok) throw new Error(`ファイル読込エラー: ${path}`);
+  const text = await res.text();
+  return [...new Set(text.split(/\r?\n/).map(s => s.trim()).filter(Boolean))];
+}
+
+async function loadTeamFile(basename){
+  return await loadLinesFile(`./data/${basename}.txt`);
+}
+
+async function loadCriteria(){
+  // 仕様: ./setting/eval-ponts.txt を読み、1行=1観点テキスト
+  // ファイルが読めない場合はエラー表示し、既定観点にフォールバック（授業停止を避ける）
+  try{
+    const lines = await loadLinesFile('./setting/eval-ponts.txt');
+    if(lines.length === 0) throw new Error('観点設定ファイルが空です（setting/eval-ponts.txt）');
+    CRITERIA = lines.map((t, i) => ({ id: `c${i+1}`, label: `観点${i+1}: ${t}` }));
+  }catch(err){
+    // フォールバック
+    CRITERIA = DEFAULT_CRITERIA.map((t, i) => ({ id: `c${i+1}`, label: `観点${i+1}: ${t}` }));
+    const status = document.getElementById('loadStatus');
+    if(status) status.textContent = `観点設定の読み込みに失敗したため既定観点で続行します: ${err.message}`;
+  }
+  buildHeader();
+  // ヒント行（CSVヘッダ表示）も更新
+  const hint = document.querySelector('.hint');
+  if(hint){
+    hint.textContent = `CSV（ヘッダ付き）：${HEADER.join(', ')}`;
+  }
+}
 
     function getMatchKey(){
       const p = new URLSearchParams(location.search);
@@ -173,10 +206,34 @@
     let TEAMS = [];
 
     async function initData(){
-      const status = document.getElementById('loadStatus');
-      try{
-        const matchKey = getMatchKey();
-        status.textContent = `チームリスト読込: ${matchKey}.txt`;
+  const status = document.getElementById('loadStatus');
+  try{
+    const matchKey = getMatchKey();
+
+    // 観点を先に読み込み（画面生成・CSVヘッダ生成に必要）
+    await loadCriteria();
+
+    status.textContent = `チームリスト読込: ${matchKey}.txt`;
+
+    // 必要ファイル読込
+    [ALL_TEAMS, TEAMS] = await Promise.all([
+      loadTeamFile('class-all'),
+      loadTeamFile(matchKey)
+    ]);
+
+    // myTeam セレクト構築（ALL_TEAMS）
+    const sel = document.getElementById('myTeam');
+    sel.innerHTML = '<option value="">選択してください</option>' +
+      ALL_TEAMS.map(n => `<option value="${n}">${n}</option>`).join('');
+
+    // 画面生成（TEAMS）
+    buildTeamSections(TEAMS);
+    updateVisibility();
+    status.textContent = `読み込み完了（対象 ${TEAMS.length} チーム / 全チーム ${ALL_TEAMS.length} / 観点 ${CRITERIA.length}）`;
+  }catch(err){
+    status.textContent = `読み込み失敗: ${err.message}`;
+  }
+}.txt`;
 
         // 必要ファイル読込
         [ALL_TEAMS, TEAMS] = await Promise.all([
@@ -200,61 +257,61 @@
 
     // ================== 画面生成 ==================
     function buildTeamSections(teams){
-      const container = document.getElementById('teamsContainer');
-      container.innerHTML = '';
-      teams.forEach(teamName => {
-        const tKey = teamKey(teamName);
-        const section = document.createElement('div');
-        section.className = 'section';
-        section.dataset.team = teamName;
+  const container = document.getElementById('teamsContainer');
+  container.innerHTML = '';
+  teams.forEach(teamName => {
+    const tKey = teamKey(teamName);
+    const section = document.createElement('div');
+    section.className = 'section';
+    section.dataset.team = teamName;
 
-        const header = document.createElement('div');
-        header.className = 'team-title';
-        header.textContent = `評価対象チーム：${teamName}`;
-        section.appendChild(header);
+    const header = document.createElement('div');
+    header.className = 'team-title';
+    header.textContent = `評価対象チーム：${teamName}`;
+    section.appendChild(header);
 
-        const criteriaDiv = document.createElement('div');
-        criteriaDiv.className = 'criteria';
+    const criteriaDiv = document.createElement('div');
+    criteriaDiv.className = 'criteria';
 
-        CRITERIA.forEach(crit => {
-          const critWrap = document.createElement('div');
-          critWrap.className = 'criterion';
+    CRITERIA.forEach(crit => {
+      const critWrap = document.createElement('div');
+      critWrap.className = 'criterion';
 
-          const label = document.createElement('div');
-          label.textContent = crit.label;
-          critWrap.appendChild(label);
+      const label = document.createElement('div');
+      label.textContent = crit.label;
+      critWrap.appendChild(label);
 
-          const choices = document.createElement('div');
-          choices.className = 'choices';
+      const choices = document.createElement('div');
+      choices.className = 'choices';
 
-          const groupName = `${tKey}_${crit.id}`;
-          SCALE.forEach(sc => {
-            const id = `${groupName}_${sc.value}`;
-            const input = document.createElement('input');
-            input.type = 'radio'; input.id = id; input.name = groupName; input.value = sc.value;
-            const lab = document.createElement('label'); lab.className = 'choice'; lab.setAttribute('for', id);
-            lab.appendChild(input);
-            const span = document.createElement('span'); span.textContent = sc.text; lab.appendChild(span);
-            choices.appendChild(lab);
-          });
-
-          critWrap.appendChild(choices);
-          criteriaDiv.appendChild(critWrap);
-        });
-
-        const comments = document.createElement('div');
-        comments.className = 'grid-2';
-        comments.innerHTML = `
-          <label>良かった点（コメント）<textarea id="${tKey}_good"></textarea></label>
-          <label>改善できる点（コメント）<textarea id="${tKey}_improve"></textarea></label>`;
-
-        section.appendChild(criteriaDiv);
-        section.appendChild(comments);
-        container.appendChild(section);
+      const groupName = `${tKey}_${crit.id}`;
+      SCALE.forEach(sc => {
+        const id = `${groupName}_${sc.value}`;
+        const input = document.createElement('input');
+        input.type = 'radio'; input.id = id; input.name = groupName; input.value = sc.value;
+        const lab = document.createElement('label'); lab.className = 'choice'; lab.setAttribute('for', id);
+        lab.appendChild(input);
+        const span = document.createElement('span'); span.textContent = sc.text; lab.appendChild(span);
+        choices.appendChild(lab);
       });
-    }
 
-    function teamsToEvaluate(myTeam){
+      critWrap.appendChild(choices);
+      criteriaDiv.appendChild(critWrap);
+    });
+
+    const comments = document.createElement('div');
+    comments.className = 'grid-2';
+    comments.innerHTML = `
+      <label>良かった点（コメント）<textarea id="${tKey}_good"></textarea></label>
+      <label>改善できる点（コメント）<textarea id="${tKey}_improve"></textarea></label>`;
+
+    section.appendChild(criteriaDiv);
+    section.appendChild(comments);
+    container.appendChild(section);
+  });
+}
+
+function teamsToEvaluate(myTeam){
       return TEAMS.filter(t => t !== myTeam);
     }
 
