@@ -169,12 +169,19 @@ function buildHeader(){
     }
 
     // ================== データ読み込み（match パラメータ） ==================
-    async function loadLinesFile(path){
+    function splitLines(text){
+  // 正規表現リテラルを避けて、改行コード差異（CRLF/LF/CR）を安全に吸収
+  const normalized = String(text ?? '').replaceAll('\r\n','\n').replaceAll('\r','\n');
+  return normalized.split('\n').map(s => s.trim()).filter(Boolean);
+}
+
+async function loadLinesFile(path){
   const res = await fetch(path);
   if(!res.ok) throw new Error(`ファイル読込エラー: ${path}`);
   const text = await res.text();
-  return [...new Set(text.split(/\r?\n/).map(s => s.trim()).filter(Boolean))];
+  return [...new Set(splitLines(text))];
 }
+
 
 function readLinesFromFile(file){
   return new Promise((resolve, reject) => {
@@ -182,8 +189,15 @@ function readLinesFromFile(file){
     r.onerror = () => reject(new Error('ファイルの読み込みに失敗しました'));
     r.onload = () => {
       const text = String(r.result ?? '');
-      const lines = [...new Set(text.split(/\r?\n/).map(s => s.trim()).filter(Boolean))];
+      const lines = [...new Set(splitLines(text))];
       resolve(lines);
+    };
+    r.readAsText(file, 'utf-8');
+  });
+}
+
+// （置換の都合上、重複定義を避けるため readLinesFromFile のここまでで閉じます）
+
     };
     r.readAsText(file, 'utf-8');
   });
