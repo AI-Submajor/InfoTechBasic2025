@@ -61,7 +61,7 @@
 
   <script>
     // ================= 共通設定 =================
-    // ページを開いた時刻（表示確認用）
+    // （loaded 表示は行わない：学生が開いた時刻は提示しない）
     const LOADED_AT = formatTimestamp(new Date());
 
     // デプロイ版の識別子（キャッシュ/反映確認用）
@@ -71,6 +71,17 @@
     async function initBuildId(){
       try{
         const res = await fetch(location.href, { method: 'HEAD', cache: 'no-store' });
+        const lm = res.headers.get('Last-Modified');
+        if(lm){
+          const d = new Date(lm);
+          if(!isNaN(d.getTime())){
+            // 日本時間（JST）に変換して表示用文字列を作成（タイムゾーン表記は出さない）
+            const jst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+            BUILD_ID = formatTimestamp(jst);
+          }
+        }
+      }catch(_){ /* ignore */ }
+    });
         const lm = res.headers.get('Last-Modified');
         if(lm){
           const d = new Date(lm);
@@ -382,7 +393,7 @@
     // ================== 初期化 ==================
     function setPageTitle(){
       const key = getMatchKey();
-      const title = `相互評価フォーム(${key}) [deployed ${BUILD_ID} / loaded ${LOADED_AT}]`;
+      const title = `相互評価フォーム(${key}) [deployed ${BUILD_ID}]`;
       const titleEl = document.getElementById('pageTitle');
       if(titleEl) titleEl.textContent = title;
       document.title = title;
