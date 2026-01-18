@@ -11,8 +11,12 @@
     .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;}
     .card{border:1px solid #ddd;border-radius:12px;padding:14px;background:#fafafa;margin:14px 0;}
     .charts{display:grid;grid-template-columns:1fr;gap:18px;}
+    .chartBox{position: relative; height: 320px;}
+    .chartBox canvas{width:100% !important; height:100% !important;}
+    
+    
     @media (min-width: 980px){.charts{grid-template-columns:1fr 1fr;}}
-    canvas{background:#fff;border:1px solid #eee;border-radius:12px;padding:10px;}
+    canvas{background:#fff;border:1px solid #eee;border-radius:12px;}
     table{border-collapse:collapse;width:100%;background:#fff;border:1px solid #eee;border-radius:12px;overflow:hidden;}
     th,td{border-bottom:1px solid #eee;padding:10px;text-align:left;}
     th{background:#f6f6f6;}
@@ -197,9 +201,13 @@
         title.textContent = `観点${c.n}：チーム別平均点`;
         wrap.appendChild(title);
 
+        // Chart.js のリサイズ無限ループ対策：親要素に固定高さを持たせる
+        const box = document.createElement('div');
+        box.className = 'chartBox';
+
         const canvas = document.createElement('canvas');
-        canvas.height = 240;
-        wrap.appendChild(canvas);
+        box.appendChild(canvas);
+        wrap.appendChild(box);
         container.appendChild(wrap);
 
         const values = data.map(d => d.scores[i]);
