@@ -171,9 +171,14 @@ function buildHeader(){
     // ================== データ読み込み（match パラメータ） ==================
     function splitLines(text){
   // 正規表現リテラルを避け、改行コード差異（CRLF/LF/CR）を安全に吸収
-  const s = String(text ?? '');
-  const normalized = s.replaceAll("\r\n", "\n").replaceAll("\r", "\n");
-  return normalized.split("\n").map(v => v.trim()).filter(Boolean);
+  const s = String(text ?? "");
+  const normalized = s.replaceAll("
+", "
+").replaceAll("
+", "
+");
+  return normalized.split("
+").map(v => v.trim()).filter(Boolean);
 }
 
 async function loadLinesFile(path){
