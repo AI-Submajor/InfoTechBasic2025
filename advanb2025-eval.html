@@ -53,7 +53,7 @@
   <div id="teamsContainer"></div>
 
   <div class="save">
-    <button id="saveBtn">登録（スプレッドシートへ反映）</button>
+    <button id="saveBtn">登録</button>
     <span id="submitStatus" class="muted" style="margin-left:10px;"></span>
     <div class="hint" id="csvHint">CSV（ヘッダ付き）：</div>
     <div id="errorBox" role="alert" aria-live="polite"></div>
@@ -63,7 +63,10 @@
     // ================= 共通設定 =================
     // このHTMLファイルの版（キャッシュ確認用）
     // ※新しい版をアップロードしたら、この値も更新してください。
-    const BUILD_ID = "2026-01-18T00:00:00+09:00";
+    // ※アップロードのたびに更新してください（キャッシュ確認用）
+    const BUILD_ID = "2026-01-18T12:00:00+09:00";
+    // ページを開いた時刻（キャッシュ判定ではなく、表示確認用）
+    const LOADED_AT = formatTimestamp(new Date());
 
     // Google Apps Script Webアプリ（results へ追記）
     const GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwuKpoc03JqDKGh2w3Wi7DQ74B6QLnVvoNiH568AzFaP9j6_JQaVEsszarO7odSw30L/exec";
@@ -369,8 +372,8 @@
     (function(){
       const key = getMatchKey();
       const titleEl = document.getElementById('pageTitle');
-      if(titleEl) titleEl.textContent = `相互評価フォーム(${key}) [build ${BUILD_ID}]`;
-      document.title = `相互評価フォーム(${key}) [build ${BUILD_ID}]`;
+      if(titleEl) titleEl.textContent = `相互評価フォーム(${key}) [build ${BUILD_ID} / loaded ${LOADED_AT}]`;
+      document.title = `相互評価フォーム(${key}) [build ${BUILD_ID} / loaded ${LOADED_AT}]`;
     })();
 
     async function initData(){
