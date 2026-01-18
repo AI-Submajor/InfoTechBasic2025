@@ -61,12 +61,10 @@
 
   <script>
     // ================= 共通設定 =================
-    // （loaded 表示は行わない：学生が開いた時刻は提示しない）
-    const LOADED_AT = formatTimestamp(new Date());
 
     // デプロイ版の識別子（キャッシュ/反映確認用）
     // GitHub Pages 等では、同一オリジンの HEAD を叩いて Last-Modified を取得できることがあります。
-    // 取れた場合は、それを「版」の目安として表示・送信に使います（手作業でBUILD_IDを更新しなくてOK）。
+    // 取れた場合は、それを「版」の目安として表示・送信に使います。
     let BUILD_ID = 'unknown';
     async function initBuildId(){
       try{
@@ -79,13 +77,6 @@
             const jst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
             BUILD_ID = formatTimestamp(jst);
           }
-        }
-      }catch(_){ /* ignore */ }
-    });
-        const lm = res.headers.get('Last-Modified');
-        if(lm){
-          const d = new Date(lm);
-          if(!isNaN(d.getTime())) BUILD_ID = d.toISOString();
         }
       }catch(_){ /* ignore */ }
     }
