@@ -170,9 +170,10 @@ function buildHeader(){
 
     // ================== データ読み込み（match パラメータ） ==================
     function splitLines(text){
-  // 正規表現リテラルを避けて、改行コード差異（CRLF/LF/CR）を安全に吸収
-  const normalized = String(text ?? '').replaceAll('\r\n','\n').replaceAll('\r','\n');
-  return normalized.split('\n').map(s => s.trim()).filter(Boolean);
+  // 正規表現リテラルを避け、改行コード差異（CRLF/LF/CR）を安全に吸収
+  const s = String(text ?? '');
+  const normalized = s.replaceAll("\r\n", "\n").replaceAll("\r", "\n");
+  return normalized.split("\n").map(v => v.trim()).filter(Boolean);
 }
 
 async function loadLinesFile(path){
@@ -196,12 +197,7 @@ function readLinesFromFile(file){
   });
 }
 
-// （置換の都合上、重複定義を避けるため readLinesFromFile のここまでで閉じます）
-
-    };
-    r.readAsText(file, 'utf-8');
-  });
-}
+// readLinesFromFile 定義ここまで
 
 async function loadTeamFile(basename){
   return await loadLinesFile(`./data/${basename}.txt`);
