@@ -34,18 +34,15 @@
   <h1>結果発表</h1>
   <div class="row muted">
     <span class="pill" id="sheetInfo">読み込み中…</span>
-    <span class="pill">参照: summary シート</span>
+    <span class="pill">参照: <span id="sheetName">summary</span> シート</span>
   </div>
 
   <div class="card">
     <div class="row">
-      <label class="muted">match で絞り込み（任意）
-        <input id="matchFilter" placeholder="例: class-a（空欄で全体）" />
-      </label>
+      <span class="muted">URLでシート（試合）を指定できます：<code>?match=match-1</code> / <code>?match=match-2</code>（.txt 付きでも可）</span>
       <button id="reloadBtn">再読み込み</button>
       <span class="muted" id="status"></span>
     </div>
-    <div class="muted" style="margin-top:6px;">※ summary に match 列が無い場合は無視されます。</div>
   </div>
 
   <div id="err" class="error" style="display:none"></div>
@@ -65,7 +62,21 @@
   <script>
     // ====== 設定 ======
     const SPREADSHEET_ID = '1CZWOCDTm-UJz7yyPgiPcUzMnLyja80FgCGGP6E72FQ4';
-    const SHEET_NAME = 'summary';
+
+    // 既定は summary。勝ち抜き戦などで match ごとにタブ（シート）を分ける場合は
+    // URLで ?match=match-1 のように指定して、そのシートを参照します。
+    function sanitizeSheetName(raw){
+      let s = String(raw ?? '').trim();
+      if(!s) return 'summary';
+      // match=match-1.txt のような指定も許容
+      if(s.toLowerCase().endsWith('.txt')) s = s.slice(0, -4);
+      // 安全な文字のみ許可（シート名に使いやすい範囲）
+      s = s.replace(/[^0-9A-Za-z_\-]/g, '');
+      return s || 'summary';
+    }
+
+    const p = new URLSearchParams(location.search);
+    const SHEET_NAME = sanitizeSheetName(p.get('match') || p.get('sheet'));
 
     // gviz で CSV 出力（シートが「リンクを知っている全員が閲覧可」等で見える必要があります）
     const CSV_URL_BASE = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(SHEET_NAME)}`;
@@ -142,16 +153,13 @@
       });
       critCols.sort((a,b)=>a.n-b.n);
 
-      // 3) match 列（任意）
-      const matchCol = headers.findIndex(h => h.toLowerCase() === 'match');
-
-      return { teamCol, critCols, matchCol };
+      return { teamCol, critCols };
     }
 
-    function buildData(rows, matchFilter){
+    function buildData(rows){
       if(rows.length < 2) throw new Error('summary シートにデータがありません（ヘッダ1行＋データ行が必要）');
       const headers = rows[0].map(normalizeHeader);
-      const { teamCol, critCols, matchCol } = inferColumns(headers);
+      const { teamCol, critCols } = inferColumns(headers);
       if(critCols.length === 0) throw new Error('観点列（観点1, 観点2, ...）が見つかりません。summary の列名を確認してください。');
 
       const data = [];
@@ -159,11 +167,6 @@
         const row = rows[r];
         const team = String(row[teamCol] ?? '').trim();
         if(!team) continue;
-
-        if(matchFilter && matchCol >= 0){
-          const m = String(row[matchCol] ?? '').trim();
-          if(m !== matchFilter) continue;
-        }
 
         const scores = critCols.map(c => toNumber(row[c.idx]));
         // NaN が混じる行はスキップ（集計シートに空欄がある場合）
@@ -279,7 +282,6 @@
       clearError();
       const status = document.getElementById('status');
       const btn = document.getElementById('reloadBtn');
-      const matchFilter = document.getElementById('matchFilter').value.trim();
 
       try{
         btn.disabled = true;
@@ -292,7 +294,7 @@
         const text = await res.text();
 
         const rows = parseCSV(text);
-        const built = buildData(rows, matchFilter);
+        const built = buildData(rows);
 
         document.getElementById('sheetInfo').textContent = `チーム数: ${built.data.length} / 観点数: ${built.critCols.length}`;
 
@@ -309,6 +311,9 @@
     }
 
     document.getElementById('reloadBtn').addEventListener('click', loadAndRender);
+
+    // 参照シート名を表示
+    document.getElementById('sheetName').textContent = SHEET_NAME;
 
     // 初回ロード
     loadAndRender();
