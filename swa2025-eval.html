@@ -194,10 +194,24 @@
       buildHeader();
     }
 
+    function sanitizeMatchParam(raw){
+      let s = String(raw ?? '').trim();
+      if(!s) return 'class-all';
+
+      // よくある指定（match=match-1.txt や match=./data/match-1.txt）を許容
+      s = s.replace(/^\.+\//, '');           // 先頭の ./ を除去
+      s = s.replace(/^data\//i, '');         // 先頭の data/ を除去
+      if(s.toLowerCase().endsWith('.txt')) s = s.slice(0, -4); // .txt を除去
+
+      // ファイル名として安全な文字に制限（GitHub Pages のパス解釈事故を避ける）
+      s = s.replace(/[^0-9A-Za-z_-]/g, '');
+      if(!s) return 'class-all';
+      return s;
+    }
+
     function getMatchKey(){
       const p = new URLSearchParams(location.search);
-      const key = (p.get('match') || 'class-all').toLowerCase();
-      return key;
+      return sanitizeMatchParam(p.get('match'));
     }
 
     let ALL_TEAMS = [];
